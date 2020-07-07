@@ -3,35 +3,12 @@ import * as aws from '@pulumi/aws';
 import * as pulumi from '@pulumi/pulumi';
 import * as eks from '@pulumi/eks';
 import * as k8s from '@pulumi/kubernetes';
-import * as jenkins from "./jenkins";
 
 const managedPolicyArns: string[] = [
 	'arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy',
 	'arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy',
 	'arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly'
 ];
-
-//function createAndAttachRole(name: string): aws.iam.Role {
-//	const role = new aws.iam.Role(name, {
-//		assumeRolePolicy: aws.iam.assumeRolePolicyForPrincipal({
-//			Service: 'ec2.amazonaws.com'
-//		})
-//	});
-//
-//	let counter = 0;
-//
-//	for (const policy of managedPolicyArns) {
-//		const rolePolicyAttachment = new aws.iam.RolePolicyAttachment(
-//			`${name}-policy-${counter++}`,
-//			{
-//				policyArn: policy,
-//				role
-//			}
-//		);
-//	}
-//
-//	return role;
-//}
 
 const vpc = new awsx.ec2.Vpc('ever-dev-vpc', {
 	cidrBlock: '172.16.0.0/16',
@@ -49,6 +26,14 @@ const vpc = new awsx.ec2.Vpc('ever-dev-vpc', {
 		{ type: 'private' }
 	]
 });
+
+// const jenkins_volume = new aws.ebs.Volume("jenkins", {
+//     availabilityZone: "us-east-1a",
+//     size: 100,
+//     tags: {
+//         Name: "jenkins",
+//     },
+// }, { protect: true });
 
 const allVpcSubnetsIds = vpc.privateSubnetIds.concat(
 	vpc.publicSubnetIds
@@ -74,30 +59,33 @@ const cluster = new eks.Cluster('ever-dev', {
         'scheduler'
     ],
     skipDefaultNodeGroup: false
-});
+}, /* { protect: true } */ );
 
-const kubeconfig = cluster.kubeconfig;
-
-const clusterName = cluster.core.cluster.name;
-
-const ns = new k8s.core.v1.Namespace(
-    'jenkins',
-    {},
-    { provider: cluster.provider }
-);
-
-const namespace = ns.metadata.name;
-
-const config = new pulumi.Config("jenkins");
-const instance = new jenkins.Instance({
-    name: pulumi.getStack(),
-    credentials: {
-        username: config.require("username"),
-        password: config.require("password"),
-    },
-    resources: {
-            memory: "512Mi",
-            cpu: "100m",
+const args = {
+    "name": "jenkins",
+    // Values for helm chart
+    "values": {
+        "master": {
+            "serviceType": "LoadBalancer",
+            "overwriteConfig": true,
+            "servicePort": 80,
+        },
+        "persistence": {
+            "storageClass": "gp2",
+        }
     }
-});
-export const externalIp = instance.externalIp;
+};
+// const volumeName = jenkins_volume.id;
+
+const jenkins = new k8s.helm.v2.Chart("jenkins", {
+    repo: "stable",
+    chart: "jenkins",
+    version: "2.3.0",
+    values: args.values,
+
+}, { provider: cluster.provider });
+ 
+const deployment = jenkins.getResource("v1/Service", "jenkins");
+  
+export const kubeconfig = cluster.kubeconfig;
+export const externalIp = deployment.status.loadBalancer.ingress[0].ip;
