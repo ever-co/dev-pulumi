@@ -1,5 +1,5 @@
-name: kubernetes-pulumi-jenkins
-description: Jenkins deployment on Kubernetes
+name: jenkins-eks
+description: Jenkins deployment on EKS
 runtime: nodejs
 template:
   config:
