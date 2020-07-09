@@ -29,15 +29,15 @@ const vpc = new awsx.ec2.Vpc('ever-dev-vpc', {
 
 const cluster = new eks.Cluster('ever-dev', {
     name: 'ever-dev',
-    version: '1.16',
     vpcId: vpc.id,
     publicSubnetIds: vpc.publicSubnetIds,
     privateSubnetIds: vpc.privateSubnetIds,
+    storageClasses: 'gp2',
     instanceType: 't3.medium',
     desiredCapacity: 2,
     minSize: 1,
     maxSize: 2,
-    storageClasses: 'gp2',
+    version:'1.16',
     enabledClusterLogTypes: [
         'api',
         'audit',
@@ -45,7 +45,7 @@ const cluster = new eks.Cluster('ever-dev', {
         'controllerManager',
         'scheduler'
     ],
-    skipDefaultNodeGroup: false
+    skipDefaultNodeGroup: false,
 }, /* { protect: true } */ );
 
 const jenkins_namespace = new k8s.core.v1.Namespace("jenkins", {
@@ -56,7 +56,7 @@ const jenkins_namespace = new k8s.core.v1.Namespace("jenkins", {
 }, { provider: cluster.provider} );
 
 const jenkins_ebs = new aws.ebs.Volume("jenkins-home", {
-    availabilityZone: "us-east-1b",
+    availabilityZone: "us-east-1a", 
     size: 100,
     type: "gp2",
     tags: {
@@ -86,30 +86,35 @@ const jenkins_volume = new k8s.core.v1.PersistentVolume("jenkins-volume", {
     dependsOn: [jenkins_ebs, cluster],
 });
 
-const jenkins_volume_claim = new k8s.core.v1.PersistentVolumeClaim("jenkins-pvc", {
-    metadata: {
-        name: "jenkins-pvc",
-        clusterName: cluster.eksCluster.name,
-        namespace: jenkins_namespace.metadata.name,
-    },
-    spec: {
-        accessModes: ["ReadWriteOnce"],
-        resources: {
-            requests: {
-                storage: "100Gi",
-            },
-        },
-        storageClassName: "gp2",
-        volumeName: jenkins_volume.metadata.name,
-    },
-}, {
-    provider: cluster.provider,
-    dependsOn: [jenkins_volume],
-});
+// const jenkins_volume_claim = new k8s.core.v1.PersistentVolumeClaim("jenkins-pvc", {
+//     metadata: {
+//         name: "jenkins-pvc",
+//         clusterName: cluster.eksCluster.name,
+//         namespace: jenkins_namespace.metadata.name,
+//     },
+//     spec: {
+//         accessModes: ["ReadWriteOnce"],
+//         resources: {
+//             requests: {
+//                 storage: "100Gi",
+//             },
+//         },
+//         storageClassName: "gp2",
+//         volumeName: jenkins_volume.metadata.name,
+//     },
+// }, {
+//     provider: cluster.provider,
+//     // dependsOn: [jenkins_volume],
+// });
 
 const args = {
     name: "jenkins",
 };
+
+// Needed for Jenkins Agent
+const service_account = new k8s.yaml.ConfigFile('jenkins-service-acc', {
+    file: "service-account.yaml",
+}, { provider: cluster.provider });
 
 const deployment = new k8s.apps.v1.Deployment("jenkins-deployment", {
     apiVersion: "apps/v1",
@@ -132,6 +137,7 @@ const deployment = new k8s.apps.v1.Deployment("jenkins-deployment", {
                 },
             },
             spec: {
+                serviceAccountName: "jenkins", // Needed for Jenkins agent
                 securityContext: { // change volume group owner to Jenkins
                     fsGroup: 1000,
                 },
@@ -141,7 +147,7 @@ const deployment = new k8s.apps.v1.Deployment("jenkins-deployment", {
                         image: "jenkins/jenkins:lts",
                         ports: [
                             {
-                                containerPort: 80,
+                                containerPort: 8080,
                             },
                         ],
                         volumeMounts: [
@@ -169,7 +175,7 @@ const deployment = new k8s.apps.v1.Deployment("jenkins-deployment", {
     },
 }, {
     provider: cluster.provider,
-    dependsOn: [jenkins_volume_claim, jenkins_ebs],
+    dependsOn: [jenkins_ebs, service_account],
 });
 
 const service = new k8s.core.v1.Service("jenkins-service", {
@@ -185,7 +191,7 @@ const service = new k8s.core.v1.Service("jenkins-service", {
         ports: [
             {
                 port: 80,
-                targetPort: 80,
+                targetPort: 8080,
             }
         ],
         selector: {
@@ -198,15 +204,22 @@ const service = new k8s.core.v1.Service("jenkins-service", {
 });
  
 export const externalIp = service.status.loadBalancer.ingress[0].hostname;
-const elbHostedZoneId = pulumi.output(aws.elb.getHostedZoneId()).id;
+const elbHostedZoneId = pulumi.output(aws.elb.getHostedZoneId());
+const zone = pulumi.output(aws.route53.getZone({
+    name: "ever.co",
+    privateZone: false,
+}, { async: true }));
+
 
 const ci_ever = new aws.route53.Record("ci-ever", {
-    name: `${externalIp}`,
-    records: ["ci.ever.co"],
-    setIdentifier: "ci",
-    ttl: 300,
-    type: "CNAME",
-    zoneId: elbHostedZoneId,
+    name: "ci",
+    type: "A",
+    zoneId: zone.id,
+    aliases: [{
+        evaluateTargetHealth: true,
+        name: externalIp,
+        zoneId: elbHostedZoneId.id,
+    }],
 });
 
 export const kubeconfig = cluster.kubeconfig;
