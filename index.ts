@@ -3,6 +3,9 @@ import * as aws from '@pulumi/aws';
 import * as pulumi from '@pulumi/pulumi';
 import * as eks from '@pulumi/eks';
 import * as k8s from '@pulumi/kubernetes';
+import * as cloudflare from '@pulumi/cloudflare';
+
+const config = new pulumi.Config();
 
 const managedPolicyArns: string[] = [
 	'arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy',
@@ -86,26 +89,6 @@ const jenkins_volume = new k8s.core.v1.PersistentVolume("jenkins-volume", {
     dependsOn: [jenkins_ebs, cluster],
 });
 
-// const jenkins_volume_claim = new k8s.core.v1.PersistentVolumeClaim("jenkins-pvc", {
-//     metadata: {
-//         name: "jenkins-pvc",
-//         clusterName: cluster.eksCluster.name,
-//         namespace: jenkins_namespace.metadata.name,
-//     },
-//     spec: {
-//         accessModes: ["ReadWriteOnce"],
-//         resources: {
-//             requests: {
-//                 storage: "100Gi",
-//             },
-//         },
-//         storageClassName: "gp2",
-//         volumeName: jenkins_volume.metadata.name,
-//     },
-// }, {
-//     provider: cluster.provider,
-//     // dependsOn: [jenkins_volume],
-// });
 
 const args = {
     name: "jenkins",
@@ -149,6 +132,9 @@ const deployment = new k8s.apps.v1.Deployment("jenkins-deployment", {
                             {
                                 containerPort: 8080,
                             },
+                            {
+                                containerPort: 50000, // This port is necessary for agent pods
+                            },
                         ],
                         volumeMounts: [
                             {
@@ -161,9 +147,6 @@ const deployment = new k8s.apps.v1.Deployment("jenkins-deployment", {
                 volumes: [
                     {
                         name: "jenkins-home",
-                        // persistentVolumeClaim: {
-                        //     claimName: jenkins_volume_claim.metadata.name,
-                        // },
                         awsElasticBlockStore: {
                             volumeID: jenkins_ebs.id,
                             fsType: "ext4",
@@ -190,9 +173,15 @@ const service = new k8s.core.v1.Service("jenkins-service", {
         type: "LoadBalancer",
         ports: [
             {
+                name: "http",
                 port: 80,
                 targetPort: 8080,
-            }
+            },
+            {
+                name: "agent", // for agent pods
+                port: 50000,
+                targetPort: 50000,
+            },
         ],
         selector: {
             app: args.name,
@@ -202,24 +191,13 @@ const service = new k8s.core.v1.Service("jenkins-service", {
     provider: cluster.provider,
     dependsOn: [deployment],
 });
- 
+
 export const externalIp = service.status.loadBalancer.ingress[0].hostname;
-const elbHostedZoneId = pulumi.output(aws.elb.getHostedZoneId());
-const zone = pulumi.output(aws.route53.getZone({
-    name: "ever.co",
-    privateZone: false,
-}, { async: true }));
-
-
-const ci_ever = new aws.route53.Record("ci-ever", {
-    name: "ci",
-    type: "A",
-    zoneId: zone.id,
-    aliases: [{
-        evaluateTargetHealth: true,
-        name: externalIp,
-        zoneId: elbHostedZoneId.id,
-    }],
-});
-
 export const kubeconfig = cluster.kubeconfig;
+
+const ci_ever = new cloudflare.Record('ci-ever', {
+    name: "ci.ever.co",
+    type: "CNAME",
+    value: externalIp,
+    zoneId: `${config.require("zoneId")}`,
+});

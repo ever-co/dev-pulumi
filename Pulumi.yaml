@@ -8,3 +8,6 @@ template:
     password:
       description: Your desired password for the Jenkins instance
       secret: true
+    zoneId:
+      description: The ZoneID to update the CloudFlare DNS Records
+      secret: true
