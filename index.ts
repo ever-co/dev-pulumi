@@ -4,6 +4,7 @@ import * as pulumi from '@pulumi/pulumi';
 import * as eks from '@pulumi/eks';
 import * as k8s from '@pulumi/kubernetes';
 import * as cloudflare from '@pulumi/cloudflare';
+import * as docker from '@pulumi/docker';
 
 const config = new pulumi.Config();
 
@@ -92,12 +93,30 @@ const jenkins_volume = new k8s.core.v1.PersistentVolume("jenkins-volume", {
 
 const args = {
     name: "jenkins",
+    domain: "ci.ever.co",
 };
 
 // Needed for Jenkins Agent
 const service_account = new k8s.yaml.ConfigFile('jenkins-service-acc', {
     file: "service-account.yaml",
 }, { provider: cluster.provider });
+
+const certificate = new aws.acm.Certificate("jenkins", {
+    domainName: args.domain,
+    validationMethod: "DNS",
+});
+
+const validate = new cloudflare.Record("jenkins-validation", {
+    name: certificate.domainValidationOptions[0].resourceRecordName,
+    type: certificate.domainValidationOptions[0].resourceRecordType,
+    value: certificate.domainValidationOptions[0].resourceRecordValue,
+    zoneId: `${config.require('zoneId')}`,
+});
+
+const repository = new aws.ecr.Repository('jenkins', {
+    name: "ever-co/jenkins",
+    imageTagMutability: "MUTABLE",
+});
 
 const deployment = new k8s.apps.v1.Deployment("jenkins-deployment", {
     apiVersion: "apps/v1",
@@ -127,7 +146,7 @@ const deployment = new k8s.apps.v1.Deployment("jenkins-deployment", {
                 containers: [
                     {
                         name: "jenkins",
-                        image: "jenkins/jenkins:lts",
+                        image: "lemagicien/jenkins:latest",
                         ports: [
                             {
                                 containerPort: 8080,
@@ -168,6 +187,14 @@ const service = new k8s.core.v1.Service("jenkins-service", {
         name: args.name,
         clusterName: cluster.eksCluster.name,
         namespace: jenkins_namespace.metadata.name,
+        // annotations: {
+        //     'service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags': 'Name=gauzy-api-ingress',
+		// 	'service.beta.kubernetes.io/aws-load-balancer-ssl-cert': certificate.arn,
+		// 	'service.beta.kubernetes.io/aws-load-balancer-backend-protocol': 'http',
+		// 	'service.beta.kubernetes.io/aws-load-balancer-ssl-ports': 'https',
+		// 	'service.beta.kubernetes.io/aws-load-balancer-access-log-enabled': 'true',
+		// 	'service.beta.kubernetes.io/aws-load-balancer-access-log-emit-interval': '5'
+        // },
     },
     spec: {
         type: "LoadBalancer",
@@ -175,6 +202,11 @@ const service = new k8s.core.v1.Service("jenkins-service", {
             {
                 name: "http",
                 port: 80,
+                targetPort: 8080,
+            },
+            {
+                name: "https",
+                port: 443,
                 targetPort: 8080,
             },
             {
@@ -196,7 +228,7 @@ export const externalIp = service.status.loadBalancer.ingress[0].hostname;
 export const kubeconfig = cluster.kubeconfig;
 
 const ci_ever = new cloudflare.Record('ci-ever', {
-    name: "ci.ever.co",
+    name: args.domain,
     type: "CNAME",
     value: externalIp,
     zoneId: `${config.require("zoneId")}`,
