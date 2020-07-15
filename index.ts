@@ -56,11 +56,16 @@ const jenkins_namespace = new k8s.core.v1.Namespace("jenkins", {
     metadata: {
         name: "jenkins",
         clusterName: cluster.eksCluster.name,
+        labels: {
+            app: "jenkins",
+        }
     },
 }, { provider: cluster.provider} );
 
+const ebsAZ: string = "us-east-1a";
+
 const jenkins_ebs = new aws.ebs.Volume("jenkins-home", {
-    availabilityZone: "us-east-1a", 
+    availabilityZone: ebsAZ, 
     size: 100,
     type: "gp2",
     tags: {
@@ -127,6 +132,9 @@ const deployment = new k8s.apps.v1.Deployment("jenkins-deployment", {
     },
     spec: {
         replicas: 1,
+        strategy: {
+            type: "Recreate",
+        },
         selector: {
             matchLabels: {
                 app: args.name,
@@ -143,10 +151,14 @@ const deployment = new k8s.apps.v1.Deployment("jenkins-deployment", {
                 securityContext: { // change volume group owner to Jenkins
                     fsGroup: 1000,
                 },
+                nodeSelector: {
+                    "failure-domain.beta.kubernetes.io/zone": ebsAZ,
+                },
                 containers: [
                     {
                         name: "jenkins",
-                        image: "lemagicien/jenkins:latest",
+                        image: "jenkins/jenkins:latest",
+                        imagePullPolicy: "Always",
                         ports: [
                             {
                                 containerPort: 8080,
@@ -159,7 +171,7 @@ const deployment = new k8s.apps.v1.Deployment("jenkins-deployment", {
                             {
                                 name: "jenkins-home",
                                 mountPath: "/var/jenkins_home",
-                            }
+                            },
                         ],
                     },
                 ],
@@ -169,8 +181,8 @@ const deployment = new k8s.apps.v1.Deployment("jenkins-deployment", {
                         awsElasticBlockStore: {
                             volumeID: jenkins_ebs.id,
                             fsType: "ext4",
-                        }
-                    }
+                        },
+                    },
                 ],
             },
         },
@@ -224,6 +236,28 @@ const service = new k8s.core.v1.Service("jenkins-service", {
     dependsOn: [deployment],
 });
 
+const keyPair = new aws.ec2.KeyPair('jenkins', {
+    keyName: `${args.name}-node`,
+    publicKey: config.require("publicKey"),
+    tags: {
+        name: args.name,
+    },
+});
+
+const nodes = new aws.ec2.Instance('jenkins', {
+    ami: "ami-0ac80df6eff0e70b5", // Ubuntu Server 18.04 AMI
+    availabilityZone: "us-east-1a",
+    associatePublicIpAddress: true,
+    disableApiTermination: true,
+    keyName: keyPair.keyName,
+    instanceType: "t3.medium", // 2 vCPU 4GB RAM
+    rootBlockDevice: {
+        volumeSize: 75,
+        volumeType: "gp2",
+    },
+});
+
+export const nodeIp = nodes.publicIp;
 export const externalIp = service.status.loadBalancer.ingress[0].hostname;
 export const kubeconfig = cluster.kubeconfig;
 

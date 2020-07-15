@@ -11,3 +11,6 @@ template:
     zoneId:
       description: The ZoneID to update the CloudFlare DNS Records
       secret: true
+    publicKey:
+      description: Public key to be associated with the created instances
+      secret: true
