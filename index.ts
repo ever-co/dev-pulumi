@@ -248,16 +248,17 @@ const nodes = new aws.ec2.Instance('jenkins', {
     ami: "ami-0ac80df6eff0e70b5", // Ubuntu Server 18.04 AMI
     availabilityZone: "us-east-1a",
     associatePublicIpAddress: true,
-    disableApiTermination: true,
     keyName: keyPair.keyName,
-    instanceType: "t3.medium", // 2 vCPU 4GB RAM
+    instanceType: "i3.xlarge", // 2 vCPU 15.5GB RAM
     rootBlockDevice: {
-        volumeSize: 75,
-        volumeType: "gp2",
+        volumeSize: 25,
     },
+    tags: {
+        Name: "jenkins",
+    }
 });
 
-export const nodeIp = nodes.publicIp;
+export const instanceIp = nodes.publicIp;
 export const externalIp = service.status.loadBalancer.ingress[0].hostname;
 export const kubeconfig = cluster.kubeconfig;
 

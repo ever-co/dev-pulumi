@@ -1,0 +1,99 @@
+---
+  - name: Playbook for installing Docker and Java on the agent nodes
+    hosts: instances
+    remote_user: ubuntu
+    tasks:
+      - name: Install dependencies for Docker repository
+        apt:
+          name: [ 'apt-transport-https', 'ca-certificates', 'curl', 'gnupg-agent', 'software-properties-common', 'openjdk-8-jre-headless', 'aptitude', 'python-minimal' ]
+          update_cache: yes
+        become: true
+
+      - name: Add apt key
+        apt_key:
+          url: https://download.docker.com/linux/ubuntu/gpg
+          state: "present"
+        become: true
+      
+      - name: Add Docker repository
+        apt_repository:
+          repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu bionic stable"
+          state: "present"
+        become: true
+        
+      - name: Install Docker
+        apt:
+          name: [ 'docker-ce', 'docker-ce-cli', 'containerd.io' ]
+          state: "present"
+          update_cache: yes
+        become: true
+      
+      - name: Create Jenkins directory
+        file:
+          path: "/opt/jenkins/"
+          owner: "ubuntu"
+          group: "ubuntu"
+          state: "directory"
+        become: yes
+
+      - name: Create Filesystem for the NVME SSD
+        filesystem:
+          fstype: "ext4"
+          dev: "/dev/nvme0n1"
+        become: yes
+
+      - name: Mount the SSD to the Jenkins location
+        mount:
+          fstype: "ext4"
+          src: "/dev/nvme0n1"
+          path: "/opt/jenkins"
+          state: "mounted"
+        become: yes
+  
+      - name: Create directory for Docker on SSD
+        file:
+          path: "/opt/jenkins/docker"
+          owner: root
+          group: root
+          state: "directory"
+        become: yes
+
+      - name: Create directory for docker service
+        file: 
+          path: "/etc/systemd/system/docker.service.d/"
+          state: "directory"
+        become: yes
+
+      - name: Change Docker's data directory
+        copy:
+          content: |
+            [Service]
+            ExecStart=
+            ExecStart=/usr/bin/dockerd -g /opt/jenkins/docker -H fd://
+          dest: "/etc/systemd/system/docker.service.d/docker.root.conf"
+        become: yes
+
+      - name: Start Docker Engine
+        systemd:
+          name: docker
+          daemon_reload: yes
+          state: "restarted"
+          enabled: yes
+          masked: no
+        become: true
+
+      - name: Add user to docker group
+        user:
+          name: ubuntu
+          append: yes
+          groups: [ 'docker' ]
+        become: true
+
+      - name: Change directory permissions (After mount)
+        file:
+          path: "/opt/jenkins/"
+          owner: ubuntu
+          group: ubuntu
+          recurse: yes
+          state: "directory"
+        become: yes
