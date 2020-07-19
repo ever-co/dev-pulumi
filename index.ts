@@ -41,7 +41,7 @@ const cluster = new eks.Cluster('ever-dev', {
     desiredCapacity: 2,
     minSize: 1,
     maxSize: 2,
-    version:'1.16',
+    version:'1.17',
     enabledClusterLogTypes: [
         'api',
         'audit',
@@ -118,9 +118,21 @@ const validate = new cloudflare.Record("jenkins-validation", {
     zoneId: `${config.require('zoneId')}`,
 });
 
-const repository = new aws.ecr.Repository('jenkins', {
-    name: "ever-co/jenkins",
-    imageTagMutability: "MUTABLE",
+const jenkinsAWSUser = new aws.iam.User('jenkins', {
+    name: "jenkins",
+    permissionsBoundary: "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser",
+    tags: {
+        Name: "jenkins",
+    },
+});
+
+const jenkinsPolicy = new aws.iam.PolicyAttachment('jenkins', {
+    policyArn: "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser",
+    users: [ "jenkins" ],
+});
+
+const credentials = new aws.iam.AccessKey('jenkins', {
+    user: "jenkins",
 });
 
 const deployment = new k8s.apps.v1.Deployment("jenkins-deployment", {
@@ -244,21 +256,23 @@ const keyPair = new aws.ec2.KeyPair('jenkins', {
     },
 });
 
-const nodes = new aws.ec2.Instance('jenkins', {
-    ami: "ami-0ac80df6eff0e70b5", // Ubuntu Server 18.04 AMI
-    availabilityZone: "us-east-1a",
-    associatePublicIpAddress: true,
-    keyName: keyPair.keyName,
-    instanceType: "i3.xlarge", // 2 vCPU 15.5GB RAM
-    rootBlockDevice: {
-        volumeSize: 25,
-    },
-    tags: {
-        Name: "jenkins",
-    }
-});
+// const nodes = new aws.ec2.Instance('jenkins', {
+//     ami: "ami-0ac80df6eff0e70b5", // Ubuntu Server 18.04 AMI
+//     availabilityZone: "us-east-1a",
+//     associatePublicIpAddress: true,
+//     keyName: keyPair.keyName,
+//     instanceType: "t3.medium", // 2 vCPU 15.5GB RAM
+//     rootBlockDevice: {
+//         volumeSize: 25,
+//     },
+//     tags: {
+//         Name: "jenkins",
+//     }
+// });
 
-export const instanceIp = nodes.publicIp;
+// export const instanceIp = nodes.publicIp;
+export const accessId = credentials.id;
+export const secretKey = credentials.secret;
 export const externalIp = service.status.loadBalancer.ingress[0].hostname;
 export const kubeconfig = cluster.kubeconfig;
 
