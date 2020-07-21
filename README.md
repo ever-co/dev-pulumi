@@ -64,5 +64,9 @@ ansible_python_interpreter=/usr/bin/python3
 
 #### Run Ansible Playbook to configure the instance for Jenkins
 ```
-$ ansible-playbook setup_node.yaml -i hosts --key-file="/your/ssh/key"
+$ ansible-playbook playbook.yaml -i hosts --key-file="/your/ssh/key"
+```
+##### If the Instance has an NVME SSD, a different playbook should be run
+```
+$ ansible-playbook playbook-nvme.yaml -i hosts --key-file="/your/ssh/key"
 ```

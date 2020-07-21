@@ -106,6 +106,14 @@ const service_account = new k8s.yaml.ConfigFile('jenkins-service-acc', {
     file: "service-account.yaml",
 }, { provider: cluster.provider });
 
+const apiRepository = new aws.ecr.Repository('gauzy-api', {
+    name: "gauzy/api",
+});
+
+const webappRepository = new aws.ecr.Repository('gauzy-webapp', {
+    name: "gauzy/webapp",
+});
+
 const certificate = new aws.acm.Certificate("jenkins", {
     domainName: args.domain,
     validationMethod: "DNS",
@@ -256,21 +264,21 @@ const keyPair = new aws.ec2.KeyPair('jenkins', {
     },
 });
 
-// const nodes = new aws.ec2.Instance('jenkins', {
-//     ami: "ami-0ac80df6eff0e70b5", // Ubuntu Server 18.04 AMI
-//     availabilityZone: "us-east-1a",
-//     associatePublicIpAddress: true,
-//     keyName: keyPair.keyName,
-//     instanceType: "t3.medium", // 2 vCPU 15.5GB RAM
-//     rootBlockDevice: {
-//         volumeSize: 25,
-//     },
-//     tags: {
-//         Name: "jenkins",
-//     }
-// });
+const instances = new aws.ec2.Instance('jenkins', {
+    ami: "ami-0ac80df6eff0e70b5", // Ubuntu Server 18.04 AMI
+    availabilityZone: "us-east-1a",
+    associatePublicIpAddress: true,
+    keyName: keyPair.keyName,
+    instanceType: "t3.large", // 2 vCPU 15.5GB RAM
+    rootBlockDevice: {
+        volumeSize: 200,
+    },
+    tags: {
+        name: "jenkins",
+    }
+});
 
-// export const instanceIp = nodes.publicIp;
+export const instanceIp = instances.publicIp;
 export const accessId = credentials.id;
 export const secretKey = credentials.secret;
 export const externalIp = service.status.loadBalancer.ingress[0].hostname;

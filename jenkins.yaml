@@ -1,0 +1,95 @@
+# This file contains the configuration for Jenkins.
+# See: https://plugins.jenkins.io/configuration-as-code/#documentation
+
+credentials:
+  system:
+    domainCredentials:
+    - credentials:
+      - string:
+          description: "GitHub API Token" # Needs ['read:packages', 'write:packages']
+          id: "github-docker-password"
+          scope: GLOBAL
+          secret: "{AQAAABAAAAAw+H2KeIgeaKubft7KWXLRTQ6MjeVtBk7QUeRG+ayXvxVRQXxRA+5CLpE6A+8xQrdHGoi76SFS2Ram1dyR294YaQ==}"
+
+jenkins:
+  systemMessage: "Jenkins configured automatically using the config file."
+  numExecutors: 0
+  slaveAgentPort: 50000
+  updateCenter:
+    sites:
+    - id: "default"
+      url: "https://updates.jenkins.io/update-center.json"
+  agentProtocols:
+  - "JNLP4-connect"
+  - "Ping"
+  authorizationStrategy:
+    roleBased:
+      roles:
+        global:
+        - assignments:
+          - "ever"
+          name: "admin"
+          pattern: ".*"
+          permissions:
+          - "Job/Move"
+          - "Job/Build"
+          - "Lockable Resources/View"
+          - "Credentials/Delete"
+          - "Credentials/ManageDomains"
+          - "Lockable Resources/Unlock"
+          - "View/Create"
+          - "Agent/Configure"
+          - "Job/Read"
+          - "Credentials/Update"
+          - "Agent/Create"
+          - "Job/ExtendedRead"
+          - "Overall/SystemRead"
+          - "Job/Delete"
+          - "Agent/Build"
+          - "View/Configure"
+          - "Lockable Resources/Reserve"
+          - "Agent/Provision"
+          - "SCM/Tag"
+          - "Job/Create"
+          - "Job/Discover"
+          - "Agent/ExtendedRead"
+          - "Credentials/View"
+          - "Agent/Connect"
+          - "Agent/Delete"
+          - "Run/Replay"
+          - "Agent/Disconnect"
+          - "Run/Delete"
+          - "Job/Cancel"
+          - "Overall/Read"
+          - "Run/Update"
+          - "Credentials/Create"
+          - "Overall/Administer"
+          - "View/Delete"
+          - "Job/Configure"
+          - "Job/Workspace"
+          - "View/Read"
+        - name: "user"
+          pattern: ".*"
+          permissions:
+          - "Job/Cancel"
+          - "Job/Build"
+          - "Credentials/Create"
+          - "Job/Read"
+          - "View/Read"
+
+unclassified:
+  location:
+    url: "ci.ever.co"
+  gitHubPluginConfig:
+    hookUrl: "http://ci.ever.co/github-webhook/"
+  gitSCM:
+    createAccountBasedOnEmail: false
+    showEntireCommitSummaryInChanges: false
+    useExistingAccountWithSameEmail: false
+  
+
+tool:
+  git:
+    installations:
+      - name: git
+        home: /usr/bin/git

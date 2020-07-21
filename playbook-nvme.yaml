@@ -5,7 +5,7 @@
     tasks:
       - name: Install dependencies for Docker repository
         apt:
-          name: [ 'apt-transport-https', 'ca-certificates', 'curl', 'gnupg-agent', 'software-properties-common', 'openjdk-8-jre-headless', 'aptitude', 'python-minimal' ]
+          name: [ 'apt-transport-https', 'ca-certificates', 'curl', 'gnupg-agent', 'software-properties-common', 'openjdk-8-jre-headless', 'aptitude', 'python-minimal', 'awscli' ]
           update_cache: yes
         become: true
 
