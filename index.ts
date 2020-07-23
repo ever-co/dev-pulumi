@@ -4,9 +4,8 @@ import * as pulumi from '@pulumi/pulumi';
 import * as eks from '@pulumi/eks';
 import * as k8s from '@pulumi/kubernetes';
 import * as cloudflare from '@pulumi/cloudflare';
-import * as docker from '@pulumi/docker';
 
-const config = new pulumi.Config();
+require('dotenv').config();
 
 const managedPolicyArns: string[] = [
 	'arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy',
@@ -107,12 +106,16 @@ const service_account = new k8s.yaml.ConfigFile('jenkins-service-acc', {
 }, { provider: cluster.provider });
 
 const apiRepository = new aws.ecr.Repository('gauzy-api', {
-    name: "gauzy/api",
-});
+    name: "gauzy-api",
+}, { protect: true });
 
 const webappRepository = new aws.ecr.Repository('gauzy-webapp', {
-    name: "gauzy/webapp",
-});
+    name: "gauzy-webapp",
+}, { protect: true });
+
+const jenkinsRepository = new aws.ecr.Repository('jenkins', {
+    name: "jenkins",
+}, { protect: true });
 
 const certificate = new aws.acm.Certificate("jenkins", {
     domainName: args.domain,
@@ -123,7 +126,7 @@ const validate = new cloudflare.Record("jenkins-validation", {
     name: certificate.domainValidationOptions[0].resourceRecordName,
     type: certificate.domainValidationOptions[0].resourceRecordType,
     value: certificate.domainValidationOptions[0].resourceRecordValue,
-    zoneId: `${config.require('zoneId')}`,
+    zoneId: `${process.env.ZONE_ID}`,
 });
 
 const jenkinsAWSUser = new aws.iam.User('jenkins', {
@@ -132,7 +135,7 @@ const jenkinsAWSUser = new aws.iam.User('jenkins', {
     tags: {
         Name: "jenkins",
     },
-});
+}, { protect: true });
 
 const jenkinsPolicy = new aws.iam.PolicyAttachment('jenkins', {
     policyArn: "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser",
@@ -141,7 +144,7 @@ const jenkinsPolicy = new aws.iam.PolicyAttachment('jenkins', {
 
 const credentials = new aws.iam.AccessKey('jenkins', {
     user: "jenkins",
-});
+}, { protect: true });
 
 const deployment = new k8s.apps.v1.Deployment("jenkins-deployment", {
     apiVersion: "apps/v1",
@@ -258,7 +261,7 @@ const service = new k8s.core.v1.Service("jenkins-service", {
 
 const keyPair = new aws.ec2.KeyPair('jenkins', {
     keyName: `${args.name}-node`,
-    publicKey: config.require("publicKey"),
+    publicKey: `${process.env.PUBLIC_KEY}`,
     tags: {
         name: args.name,
     },
@@ -288,5 +291,5 @@ const ci_ever = new cloudflare.Record('ci-ever', {
     name: args.domain,
     type: "CNAME",
     value: externalIp,
-    zoneId: `${config.require("zoneId")}`,
+    zoneId: `${process.env.ZONE_ID}`,
 });

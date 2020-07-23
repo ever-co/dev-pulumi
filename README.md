@@ -15,12 +15,6 @@ $ pulumi stack init stackname
 #### Set Cloudflare token and zone id to update DNS records
 ```
 $ pulumi config set cloudflare:apiToken <token>
-$ pulumi config set jenkins-eks:zoneId <zoneId>
-```
-
-#### Set the SSH Keypair you want to use for the instance
-```
-$ pulumi config set jenkins-eks:publicKey <yourpublickey>
 ```
 
 #### Set AWS Region  
@@ -39,34 +33,17 @@ $ export AWS_ACCESS_KEY_ID=<YOUR_ACCESS_KEY_ID>
 $ export AWS_SECRET_ACCESS_KEY=<YOUR_SECRET_ACCESS_KEY>
 ```
 
+#### Make sure deployment script is executable
+```bash
+$ chmod +x deploy.sh
+```
+
 #### See planned changes  
 ```
-$ pulumi preview 
+$ ./deploy.sh --preview 
 ```
 
 #### Apply changes    
 ```
-$ pulumi up
-```
-
-#### Add the IP address of the instance to your Ansible Inventory
-```
-$ pulumi stack output instanceIp
-```
-
-```
-[instances]
-// HOST IP GOES HERE // (No slashes)
-
-[instances:vars]
-ansible_python_interpreter=/usr/bin/python3
-```
-
-#### Run Ansible Playbook to configure the instance for Jenkins
-```
-$ ansible-playbook playbook.yaml -i hosts --key-file="/your/ssh/key"
-```
-##### If the Instance has an NVME SSD, a different playbook should be run
-```
-$ ansible-playbook playbook-nvme.yaml -i hosts --key-file="/your/ssh/key"
+$ ./deploy.sh --apply
 ```
