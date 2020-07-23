@@ -15,6 +15,9 @@ usage() {
 
     -a | --apply
     Apply planned changes
+
+    -n | --no-playbook
+    Will not run the Ansible playbook if this option is used
 EOF
 }
 
@@ -56,7 +59,9 @@ apply() {
     if [ $? -gt 0 ]; then
         sed -i "/^\[instances\]/a $instanceIp" $(pwd)/hosts # Add the IP to the hosts file
     fi
-
+    run_playbook
+}
+run_playbook() {
     prompt_key # Prompt for SSH key
     while [ ! -f "$ssh_key" ]; do
         prompt_key

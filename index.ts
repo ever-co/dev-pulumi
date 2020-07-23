@@ -117,6 +117,59 @@ const jenkinsRepository = new aws.ecr.Repository('jenkins', {
     name: "jenkins",
 }, { protect: true });
 
+const imageLifecycleAPI = new aws.ecr.LifecyclePolicy('gauzy-api', {
+    policy: {
+        rules: [{
+            rulePriority: 1,
+            action: {
+                type: "expire",
+            },
+            selection: {
+                tagStatus: "untagged",
+                countType: "sinceImagePushed",
+                countUnit: "days",
+                countNumber: 2,
+            },
+        }],
+    },
+    repository: "gauzy-api",
+});
+
+const imageLifecycleWebapp = new aws.ecr.LifecyclePolicy('gauzy-webapp', {
+    policy: {
+        rules: [{
+            rulePriority: 1,
+            action: {
+                type: "expire",
+            },
+            selection: {
+                tagStatus: "untagged",
+                countType: "sinceImagePushed",
+                countUnit: "days",
+                countNumber: 7,
+            },
+        }],
+    },
+    repository: "gauzy-webapp",
+});
+
+const imageLifecycleJenkins = new aws.ecr.LifecyclePolicy('jenkins', {
+    policy: {
+        rules: [{
+            action: {
+                type: "expire",
+            },
+            rulePriority: 1,
+            selection: {
+                tagStatus: "untagged",
+                countType: "imageCountMoreThan",
+                countNumber: 3,
+            },
+        }],
+    },
+    repository: "jenkins",
+});
+
 const certificate = new aws.acm.Certificate("jenkins", {
     domainName: args.domain,
     validationMethod: "DNS",
