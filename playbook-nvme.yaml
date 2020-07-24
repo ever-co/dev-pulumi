@@ -97,3 +97,11 @@
           recurse: yes
           state: "directory"
         become: yes
+
+      - name: Cronjob for cleaning Docker image cache
+        cron:
+          name: "Clean unused Docker images"
+          state: "present"
+          user: "ubuntu"
+          special_time: daily
+          job: "docker builder prune --force --filter until=48h"

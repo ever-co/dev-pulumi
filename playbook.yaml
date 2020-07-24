@@ -45,9 +45,16 @@
           masked: no
         become: true
 
-      - name: Add user to docker group
+      - name: Add user to Docker group
         user:
           name: ubuntu
           append: yes
           groups: [ 'docker' ]
         become: true
+
+      - name: Cronjob for cleaning Docker image cache
+        cron:
+          state: "present"
+          user: "ubuntu"
+          special_time: daily
+          job: "docker builder prune --force --filter until=48h"
