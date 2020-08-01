@@ -57,4 +57,6 @@
           state: "present"
           user: "ubuntu"
           special_time: daily
-          job: "docker builder prune --force --filter until=48h"
+          job: |
+            "docker builder prune --force --filter until=24h"
+            "docker rmi $(docker images -q -f dangling=true)"
