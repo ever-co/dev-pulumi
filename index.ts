@@ -1,6 +1,5 @@
 import * as awsx from '@pulumi/awsx';
 import * as aws from '@pulumi/aws';
-import * as pulumi from '@pulumi/pulumi';
 import * as eks from '@pulumi/eks';
 import * as k8s from '@pulumi/kubernetes';
 import * as cloudflare from '@pulumi/cloudflare';
@@ -36,10 +35,10 @@ const cluster = new eks.Cluster('ever-dev', {
     publicSubnetIds: vpc.publicSubnetIds,
     privateSubnetIds: vpc.privateSubnetIds,
     storageClasses: 'gp2',
-    instanceType: 't3.medium',
-    desiredCapacity: 2,
+    instanceType: 'm5.xlarge',
+    desiredCapacity: 3,
     minSize: 1,
-    maxSize: 2,
+    maxSize: 3,
     version:'1.17',
     enabledClusterLogTypes: [
         'api',
@@ -51,7 +50,7 @@ const cluster = new eks.Cluster('ever-dev', {
     skipDefaultNodeGroup: false,
 }, /* { protect: true } */ );
 
-const jenkins_namespace = new k8s.core.v1.Namespace("jenkins", {
+const jenkinsNamespace = new k8s.core.v1.Namespace("jenkins-ns", {
     metadata: {
         name: "jenkins",
         clusterName: cluster.eksCluster.name,
@@ -61,27 +60,25 @@ const jenkins_namespace = new k8s.core.v1.Namespace("jenkins", {
     },
 }, { provider: cluster.provider} );
 
-const ebsAZ: string = "us-east-1a";
-
-const jenkins_ebs = new aws.ebs.Volume("jenkins-home", {
-    availabilityZone: ebsAZ, 
+const jenkinsEbs = new aws.ebs.Volume("jenkins-home", {
+    availabilityZone: "us-east-1a", 
     size: 100,
     type: "gp2",
     tags: {
-        name: "jenkins-home",
+        Name: "jenkins-home",
     },
 }, /* { protect: true } */);
 
 const jenkins_volume = new k8s.core.v1.PersistentVolume("jenkins-volume", {
     metadata: {
         clusterName: cluster.eksCluster.name,
-        namespace: jenkins_namespace.metadata.name,
+        namespace: jenkinsNamespace.metadata.name,
     },
     spec: {
         // AWS EBS only supports this mode, see: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#access-modes 
         accessModes: ["ReadWriteOnce"],
         awsElasticBlockStore: {
-            volumeID: jenkins_ebs.id,
+            volumeID: jenkinsEbs.id,
             fsType: "ext4",
         },
         capacity: {
@@ -91,7 +88,7 @@ const jenkins_volume = new k8s.core.v1.PersistentVolume("jenkins-volume", {
     },
 }, {
     provider: cluster.provider,
-    dependsOn: [jenkins_ebs, cluster],
+    dependsOn: [jenkinsEbs, cluster],
 });
 
 
@@ -199,12 +196,13 @@ const credentials = new aws.iam.AccessKey('jenkins', {
     user: "jenkins",
 }, { protect: true });
 
-const deployment = new k8s.apps.v1.Deployment("jenkins-deployment", {
+const jenkinsDeployment = new k8s.apps.v1.Deployment("jenkins-deployment", {
     apiVersion: "apps/v1",
     kind: "Deployment",
     metadata: {
         clusterName: cluster.eksCluster.name,
-        namespace: jenkins_namespace.metadata.name,
+        name: "jenkins",
+        namespace: jenkinsNamespace.metadata.name,
     },
     spec: {
         replicas: 1,
@@ -228,7 +226,7 @@ const deployment = new k8s.apps.v1.Deployment("jenkins-deployment", {
                     fsGroup: 1000,
                 },
                 nodeSelector: {
-                    "failure-domain.beta.kubernetes.io/zone": ebsAZ,
+                    "failure-domain.beta.kubernetes.io/zone": jenkinsEbs.availabilityZone,
                 },
                 containers: [
                     {
@@ -255,7 +253,7 @@ const deployment = new k8s.apps.v1.Deployment("jenkins-deployment", {
                     {
                         name: "jenkins-home",
                         awsElasticBlockStore: {
-                            volumeID: jenkins_ebs.id,
+                            volumeID: jenkinsEbs.id,
                             fsType: "ext4",
                         },
                     },
@@ -265,33 +263,24 @@ const deployment = new k8s.apps.v1.Deployment("jenkins-deployment", {
     },
 }, {
     provider: cluster.provider,
-    dependsOn: [jenkins_ebs, service_account],
+    dependsOn: [jenkinsEbs, service_account],
 });
 
-const service = new k8s.core.v1.Service("jenkins-service", {
+const jenkinsService = new k8s.core.v1.Service("jenkins-service", {
     apiVersion: "v1",
     kind: "Service",
     metadata: {
         name: args.name,
         clusterName: cluster.eksCluster.name,
-        namespace: jenkins_namespace.metadata.name,
-        // annotations: {
-        //     'service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags': 'Name=gauzy-api-ingress',
-		// 	'service.beta.kubernetes.io/aws-load-balancer-ssl-cert': certificate.arn,
-		// 	'service.beta.kubernetes.io/aws-load-balancer-backend-protocol': 'http',
-		// 	'service.beta.kubernetes.io/aws-load-balancer-ssl-ports': 'https',
-		// 	'service.beta.kubernetes.io/aws-load-balancer-access-log-enabled': 'true',
-		// 	'service.beta.kubernetes.io/aws-load-balancer-access-log-emit-interval': '5'
-        // },
+        namespace: jenkinsNamespace.metadata.name,
+        annotations: {
+            "service.beta.kubernetes.io/aws-load-balancer-ssl-cert": certificate.arn,
+            "service.beta.kubernetes.io/aws-load-balancer-backend-protocol": "http",
+        },
     },
     spec: {
         type: "LoadBalancer",
         ports: [
-            {
-                name: "http",
-                port: 80,
-                targetPort: 8080,
-            },
             {
                 name: "https",
                 port: 443,
@@ -309,14 +298,14 @@ const service = new k8s.core.v1.Service("jenkins-service", {
     },
 }, {
     provider: cluster.provider,
-    dependsOn: [deployment],
+    dependsOn: [jenkinsDeployment],
 });
 
 const keyPair = new aws.ec2.KeyPair('jenkins', {
     keyName: `${args.name}-node`,
     publicKey: `${process.env.PUBLIC_KEY}`,
     tags: {
-        name: args.name,
+        Name: args.name,
     },
 });
 
@@ -325,19 +314,19 @@ const instances = new aws.ec2.Instance('jenkins', {
     availabilityZone: "us-east-1a",
     associatePublicIpAddress: true,
     keyName: keyPair.keyName,
-    instanceType: "t3.large", // 2 vCPU 15.5GB RAM
+    instanceType: "m5.xlarge", // 2 vCPU 15.5GB RAM
     rootBlockDevice: {
         volumeSize: 200,
     },
     tags: {
-        name: "jenkins",
+        Name: "jenkins",
     }
 });
 
 export const instanceIp = instances.publicIp;
 export const accessId = credentials.id;
 export const secretKey = credentials.secret;
-export const externalIp = service.status.loadBalancer.ingress[0].hostname;
+export const externalIp = jenkinsService.status.loadBalancer.ingress[0].hostname;
 export const kubeconfig = cluster.kubeconfig;
 
 const ci_ever = new cloudflare.Record('ci-ever', {

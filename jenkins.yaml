@@ -9,7 +9,7 @@ credentials:
           description: "GitHub API Token" # Needs ['read:packages', 'write:packages']
           id: "github-docker-password"
           scope: GLOBAL
-          secret: "{AQAAABAAAAAw+H2KeIgeaKubft7KWXLRTQ6MjeVtBk7QUeRG+ayXvxVRQXxRA+5CLpE6A+8xQrdHGoi76SFS2Ram1dyR294YaQ==}"
+          secret: "{valuehere}"
 
 jenkins:
   systemMessage: "Jenkins configured automatically using the config file."
@@ -27,7 +27,6 @@ jenkins:
       roles:
         global:
         - assignments:
-          - "ever"
           name: "admin"
           pattern: ".*"
           permissions:

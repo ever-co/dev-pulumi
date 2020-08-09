@@ -83,7 +83,7 @@ fi
 
 while [[ "$1" != "" ]]; do
     case $1 in 
-        --reset-hosts) reset_hosts; ;;
+        --reset-hosts) reset_hosts; exit 0;;
         -h | --help) usage; exit 0 ;;
         -r | --refresh) pulumi_refresh; ;;
         -p | --preview) pulumi_preview; exit 0 ;;
