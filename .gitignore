@@ -2,3 +2,4 @@ node_modules/*
 kubeconfig.json
 .env
 hosts
+Pulumi.*.yaml
