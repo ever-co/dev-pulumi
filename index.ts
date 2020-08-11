@@ -71,7 +71,7 @@ const args = {
 
 // Needed for Jenkins Agent
 const service_account = new k8s.yaml.ConfigFile('jenkins-service-acc', {
-    file: "service-account.yaml",
+    file: "jenkins/service-account.yaml",
 }, { provider: cluster.provider });
 
 const apiRepository = new aws.ecr.Repository('gauzy-api', {
