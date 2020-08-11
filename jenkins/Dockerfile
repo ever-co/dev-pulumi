@@ -7,8 +7,8 @@ RUN /usr/local/bin/install-plugins.sh blueocean git credentials kubernetes \
     github-api workflow-aggregator ssh-slaves ws-cleanup role-strategy authorize-project \
     amazon-ecr
 
-COPY --chown=jenkins:jenkins jenkins-config.yaml /var/jenkins_home/casc/jenkins-config.yaml
+COPY --chown=jenkins:jenkins config.yaml /var/jenkins_home/casc/config.yaml
 
-ENV CASC_JENKINS_CONFIG /var/jenkins_home/casc/jenkins-config.yaml
+ENV CASC_JENKINS_CONFIG /var/jenkins_home/casc/config.yaml
 
 USER jenkins

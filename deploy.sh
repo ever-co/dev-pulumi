@@ -74,7 +74,7 @@ run_playbook() {
     fi
 
     echo -e "${BLUE}Firing Ansible playbook...${NC}"
-    ansible-playbook playbooks/playbook.yaml -i $(pwd)/hosts --key-file="${ssh_key}"
+    ansible-playbook jenkins/playbook.yaml -i $(pwd)/hosts --key-file="${ssh_key}"
     rm -f $(pwd)/hosts # Get rid of hosts file
 }
 

@@ -1,0 +1,11 @@
+---
+  - name: Playbook for setting up Sonarqube
+    hosts: instances
+    remote_user: ubuntu
+    tasks:
+      - name: Update host settings
+        sysctl:
+          name: vm.max_map_count
+          value: "262144"
+          state: present
+        
