@@ -6,11 +6,6 @@ import * as cloudflare from '@pulumi/cloudflare';
 
 require('dotenv').config();
 
-const managedPolicyArns: string[] = [
-	'arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy',
-	'arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy',
-	'arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly'
-];
 
 const vpc = new awsx.ec2.Vpc('ever-dev-vpc', {
 	cidrBlock: '172.16.0.0/16',
@@ -68,29 +63,6 @@ const jenkinsEbs = new aws.ebs.Volume("jenkins-home", {
         Name: "jenkins-home",
     },
 }, /* { protect: true } */);
-
-const jenkins_volume = new k8s.core.v1.PersistentVolume("jenkins-volume", {
-    metadata: {
-        clusterName: cluster.eksCluster.name,
-        namespace: jenkinsNamespace.metadata.name,
-    },
-    spec: {
-        // AWS EBS only supports this mode, see: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#access-modes 
-        accessModes: ["ReadWriteOnce"],
-        awsElasticBlockStore: {
-            volumeID: jenkinsEbs.id,
-            fsType: "ext4",
-        },
-        capacity: {
-            storage: "100Gi",
-        },
-        storageClassName: "gp2",
-    },
-}, {
-    provider: cluster.provider,
-    dependsOn: [jenkinsEbs, cluster],
-});
-
 
 const args = {
     name: "jenkins",

@@ -98,12 +98,11 @@
           state: "directory"
         become: yes
 
-      - name: Cronjob for cleaning Docker image cache
+      - name: Install Cronjob for cleaning old images
         cron:
-          name: "Clean unused Docker images"
           state: "present"
           user: "ubuntu"
-          special_time: daily
-          job: |
-            "docker builder prune --force --filter until=24h"
-            "docker rmi $(docker images -q -f dangling=true)"
+          minute: "53"
+          hour: "23"
+          name: "Cronjob for cleaning Docker image cache"
+          job: "docker builder prune --force --filter until=24h && docker rmi $(docker images -q -f dangling=true)"

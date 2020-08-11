@@ -1,7 +1,12 @@
 #!/bin/bash
 
 # This shell script automates the configuring of instances and Jenkins
-
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
 usage() {
     cat << EOF
     -a | --apply
@@ -27,57 +32,61 @@ reset_hosts() {
 [instances:vars]
 ansible_python_interpreter=/usr/bin/python3
 EOF
-    echo "Hosts file for Ansible has been reset to default state."
-}
-
-prompt_key() {
-    echo "Enter the full path to SSH Key associated with instance:"
-    read ssh_key
+    echo -e "${GREEN}Hosts file for Ansible has been reset to default state.${NC}"
 }
 
 pulumi_refresh() {
-    echo "Refreshing Pulumi stack state..."
+    echo -e "${YELLOW}Refreshing Pulumi stack state...${NC}"
     pulumi refresh --yes
 }
 
 pulumi_preview() {
-    echo "Getting planned changes..."
+    echo -e "${YELLOW}Getting planned changes...${NC}"
     pulumi preview
 }
 
 apply() {
-    echo "Applying changes... CTRL+C NOW if you want to abort!"
+    echo -e "${PURPLE}Applying changes... CTRL+C NOW if you want to abort!${NC}"
     sleep 5
     pulumi up --yes # Run Pulumi
 }
 
 run_playbook() {
-    instanceIp=$(pulumi stack output instanceIp) # Get the Ip of the node
+    set -o pipefail
+    # Check for .env
+    if [[ -f ".env" ]]; then
+        ssh_key="$(grep '^PRIVATE_KEY_PATH' .env | cut -d'=' -f2)"
+        if [ "$?" -gt 0 ]; then
+            echo -e "${RED}Could not get variable PRIVATE_KEY_PATH!${NC}" > /dev/stderr
+            exit 1
+        fi
+    else
+        echo -e "${RED}.env file is not present!${NC}" > /dev/stderr
+        exit 1
+    fi
+    # Check for hosts file
     if [ ! -f "$(pwd)/hosts" ]; then
         reset_hosts
     fi
-    grep $instanceIp hosts > /dev/null 2> /dev/null # check if IP is already in the hosts file
-    if [ $? -gt 0 ]; then
+    instanceIp=$(pulumi stack output instanceIp 2> /dev/null) # Get the Ip of the node
+    if [ $? -eq 0 ]; then
         sed -i "/^\[instances\]/a $instanceIp" $(pwd)/hosts # Add the IP to the hosts file
     fi
-    prompt_key # Prompt for SSH key
-    while [ ! -f "$ssh_key" ]; do
-        prompt_key
-    done
 
-    ansible-playbook playbook.yaml -i $(pwd)/hosts --key-file="$ssh_key"
+    echo -e "${BLUE}Firing Ansible playbook...${NC}"
+    ansible-playbook playbook.yaml -i $(pwd)/hosts --key-file="${ssh_key}"
     rm -f $(pwd)/hosts # Get rid of hosts file
 }
 
 which pulumi > /dev/null 2> /dev/null
 if [ $? -gt 0 ]; then
-    echo "ERROR! Pulumi is either not installed properly or not in PATH!"
+    echo -e "${RED}ERROR! Pulumi is either not installed properly or not in PATH!${NC}"
     exit 1
 fi
 
 which ansible-playbook > /dev/null 2> /dev/null
 if [ $? -gt 0 ]; then
-    echo "ERROR! Ansible is either not installed properly or not in PATH!"
+    echo -e "${RED}ERROR! Ansible is either not installed properly or not in PATH!${NC}"
     exit 1
 fi
 
@@ -93,5 +102,3 @@ while [[ "$1" != "" ]]; do
     esac
     shift
 done
-
-usage
