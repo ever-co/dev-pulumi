@@ -70,7 +70,10 @@ run_playbook() {
     fi
     instanceIp=$(pulumi stack output instanceIp 2> /dev/null) # Get the Ip of the node
     if [ $? -eq 0 ]; then
-        sed -i "/^\[instances\]/a $instanceIp" $(pwd)/hosts # Add the IP to the hosts file
+        grep $instanceIp $(pwd)/hosts
+        if [ ! "$?" -eq 0 ]; then
+            sed -i "/^\[instances\]/a $instanceIp" $(pwd)/hosts # Add the IP to the hosts file
+        fi
     fi
 
     echo -e "${BLUE}Firing Ansible playbook...${NC}"
@@ -79,7 +82,6 @@ run_playbook() {
     else
         ansible-playbook jenkins/playbook.yaml -i $(pwd)/hosts --key-file="${ssh_key}"
     fi
-    rm -f $(pwd)/hosts # Get rid of hosts file
 }
 
 which pulumi > /dev/null 2> /dev/null

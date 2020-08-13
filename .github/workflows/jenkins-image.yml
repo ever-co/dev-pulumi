@@ -3,7 +3,7 @@ name: Jenkins Docker Image
 on:
   push:
     branches: [ master ]
-    paths: [ 'jenkins/Dockerfile', '**/jenkins.yaml' ]
+    paths: [ 'jenkins/Dockerfile', '**/config.yaml' ]
 
 jobs:
   jenkins:

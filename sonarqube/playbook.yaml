@@ -3,6 +3,28 @@
     hosts: instances
     remote_user: ubuntu
     tasks:
+      - name: Configure Host machine for Sonarqube
+        become: yes
+        sysctl:
+          name: vm.max_map_count
+          value: "262144"
+          state: present
+          sysctl_set: yes      
+
+      - name: Install Pip
+        become: yes
+        apt:
+          name: python3-pip
+          state: present
+          update_cache: yes
+        
+      - name: Install Python package for Ansible Docker
+        pip:
+          name:
+            - docker
+            - docker-compose
+          state: present
+        
       - name: Create volume for Postgres (Sonarqube)
         docker_volume:
           name: sonarqube_postgres
@@ -18,12 +40,12 @@
           name: sonarqube_plugins
           state: present
 
-      - name: Install docker-compose
-        become: yes
-        get_url: 
-          url : https://github.com/docker/compose/releases/download/1.25.1-rc1/docker-compose-Linux-x86_64
-          dest: /usr/local/bin/docker-compose
-          mode: 'u+x,g+x'
+      # - name: Install docker-compose
+        # become: yes
+        # get_url: 
+          # url : https://github.com/docker/compose/releases/download/1.25.1-rc1/docker-compose-Linux-x86_64
+          # dest: /usr/local/bin/docker-compose
+          # mode: 'u+x,g+x'
 
       - name: Setup Sonarqube
         docker_compose:
@@ -55,4 +77,8 @@
                   SONAR_JDBC_URL: "jdbc:postgresql://database/sonarqube?currentSchema=my_schema"
                 depends_on:
                   - database
+            volumes:
+              sonarqube_logs:
+              sonarqube_plugins:
+              sonarqube_postgres:
  
