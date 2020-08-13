@@ -74,7 +74,11 @@ run_playbook() {
     fi
 
     echo -e "${BLUE}Firing Ansible playbook...${NC}"
-    ansible-playbook jenkins/playbook.yaml -i $(pwd)/hosts --key-file="${ssh_key}"
+    if [[ "$1" == "sonar" ]]; then
+        ansible-playbook sonarqube/playbook.yaml -i $(pwd)/hosts --key-file="${ssh_key}"
+    else
+        ansible-playbook jenkins/playbook.yaml -i $(pwd)/hosts --key-file="${ssh_key}"
+    fi
     rm -f $(pwd)/hosts # Get rid of hosts file
 }
 
@@ -97,7 +101,8 @@ while [[ "$1" != "" ]]; do
         -r | --refresh) pulumi_refresh; ;;
         -p | --preview) pulumi_preview; exit 0 ;;
         -a | --apply) apply; exit 0 ;;
-        -c | --configure-instance) run_playbook; ;;
+        --configure-jenkins) run_playbook; ;;
+        --configure-sonar) run_playbook "sonar"; ;;
         *) echo "Unknown parameter passed: $1"; exit 1 ;;
     esac
     shift

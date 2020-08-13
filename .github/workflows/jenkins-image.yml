@@ -3,16 +3,19 @@ name: Jenkins Docker Image
 on:
   push:
     branches: [ master ]
-    paths: [ '**/Dockerfile', '**/jenkins.yaml' ]
+    paths: [ 'jenkins/Dockerfile', '**/jenkins.yaml' ]
 
 jobs:
-  build:
+  jenkins:
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v2
+
     - name: Build the Docker image
-      run: docker build ./jenkins --file jenkins/Dockerfile --tag jenkins:latest
+      run: |
+        cd jenkins/
+        docker build --tag jenkins:latest .
       
     - name: Login to ECR
       id: ecr

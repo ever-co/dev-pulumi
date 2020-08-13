@@ -86,6 +86,10 @@ const jenkinsRepository = new aws.ecr.Repository('jenkins', {
     name: "jenkins",
 }, { protect: true });
 
+const sonarqubeRepository = new aws.ecr.Repository('sonarqube', {
+    name: "sonarqube",
+}, { protect: true });
+
 const imageLifecycleAPI = new aws.ecr.LifecyclePolicy('gauzy-api', {
     policy: {
         rules: [{
@@ -101,7 +105,7 @@ const imageLifecycleAPI = new aws.ecr.LifecyclePolicy('gauzy-api', {
             },
         }],
     },
-    repository: "gauzy-api",
+    repository: apiRepository.name,
 });
 
 const imageLifecycleWebapp = new aws.ecr.LifecyclePolicy('gauzy-webapp', {
@@ -119,7 +123,7 @@ const imageLifecycleWebapp = new aws.ecr.LifecyclePolicy('gauzy-webapp', {
             },
         }],
     },
-    repository: "gauzy-webapp",
+    repository: webappRepository.name,
 });
 
 const imageLifecycleJenkins = new aws.ecr.LifecyclePolicy('jenkins', {
@@ -136,7 +140,24 @@ const imageLifecycleJenkins = new aws.ecr.LifecyclePolicy('jenkins', {
             },
         }],
     },
-    repository: "jenkins",
+    repository: jenkinsRepository.name,
+});
+
+const imageLifecycleSonarqube = new aws.ecr.LifecyclePolicy('sonarqube', {
+    policy: {
+        rules: [{
+            action: {
+                type: "expire",
+            },
+            rulePriority: 1,
+            selection: {
+                tagStatus: "untagged",
+                countType: "imageCountMoreThan",
+                countNumber: 3,
+            },
+        }],
+    },
+    repository: sonarqubeRepository.name,
 });
 
 const certificate = new aws.acm.Certificate("jenkins", {

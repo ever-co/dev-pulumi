@@ -3,9 +3,56 @@
     hosts: instances
     remote_user: ubuntu
     tasks:
-      - name: Update host settings
-        sysctl:
-          name: vm.max_map_count
-          value: "262144"
+      - name: Create volume for Postgres (Sonarqube)
+        docker_volume:
+          name: sonarqube_postgres
           state: present
-        
+
+      - name: Create volume for logs
+        docker_volume:
+          name: sonarqube_logs
+          state: present
+
+      - name: Create volume for plugins
+        docker_volume:
+          name: sonarqube_plugins
+          state: present
+
+      - name: Install docker-compose
+        become: yes
+        get_url: 
+          url : https://github.com/docker/compose/releases/download/1.25.1-rc1/docker-compose-Linux-x86_64
+          dest: /usr/local/bin/docker-compose
+          mode: 'u+x,g+x'
+
+      - name: Setup Sonarqube
+        docker_compose:
+          project_name: sonarqube
+          definition:
+            version: '3.8'
+            services:
+              database:
+                image: postgres:12.2
+                ports:
+                  - "5432:5432"
+                volumes:
+                  - "sonarqube_postgres:/var/lib/postgresql/data"
+                environment:
+                  POSTGRES_USER: "{{ postgres_user }}"
+                  POSTGRES_PASSWORD: "{{ postgres_password }}"
+                  POSTGRES_DB: "{{ postgres_db }}"
+
+              sonarqube:
+                image: "{{ sonar_repository }}"
+                volumes:
+                  - "sonarqube_logs:/opt/sonarqube/logs"
+                  - "sonarqube_plugins:/opt/sonarqube/extensions"
+                ports:
+                  - "9000:9000"
+                environment:
+                  SONAR_JDBC_USERNAME: "{{ postgres_user }}"
+                  SONAR_JDBC_PASSWORD: "{{ postgres_password }}"
+                  SONAR_JDBC_URL: "jdbc:postgresql://database/sonarqube?currentSchema=my_schema"
+                depends_on:
+                  - database
+ 
