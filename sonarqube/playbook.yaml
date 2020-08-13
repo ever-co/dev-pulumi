@@ -74,7 +74,7 @@
                 environment:
                   SONAR_JDBC_USERNAME: "{{ postgres_user }}"
                   SONAR_JDBC_PASSWORD: "{{ postgres_password }}"
-                  SONAR_JDBC_URL: "jdbc:postgresql://database/sonarqube?currentSchema=my_schema"
+                  # SONAR_JDBC_URL: "jdbc:postgresql://database/sonarqube?currentSchema=my_schema"
                 depends_on:
                   - database
             volumes:
