@@ -328,3 +328,10 @@ const ci_ever = new cloudflare.Record('ci-ever', {
     value: externalIp,
     zoneId: `${process.env.ZONE_ID}`,
 });
+
+const sonar_ever = new cloudflare.Record('sonarqube', {
+    name: "sonarqube.ever.co",
+    type: "A",
+    value: instanceIp,
+    zoneId: `${process.env.ZONE_ID}`,
+});
