@@ -6,7 +6,6 @@ import * as cloudflare from '@pulumi/cloudflare';
 
 require('dotenv').config();
 
-
 const vpc = new awsx.ec2.Vpc('ever-dev-vpc', {
 	cidrBlock: '172.16.0.0/16',
 	subnets: [
@@ -16,12 +15,15 @@ const vpc = new awsx.ec2.Vpc('ever-dev-vpc', {
 				// TODO: we need to know AWS Cluster name to put in here!!!
 				// Next tags needed so k8s found public Subnets where to add external ELB
 				// see https://github.com/kubernetes/kubernetes/issues/29298
-				KubernetesCluster: 'ever-dev',
-				'kubernetes.io/role/elb': ''
+                KubernetesCluster: 'ever-dev',
+				'kubernetes.io/role/elb': '1',
 			}
 		},
 		{ type: 'private' }
-	]
+    ],
+    tags: {
+        Name: 'ever-dev',
+    }
 });
 
 const cluster = new eks.Cluster('ever-dev', {
@@ -35,6 +37,10 @@ const cluster = new eks.Cluster('ever-dev', {
     minSize: 1,
     maxSize: 3,
     version:'1.17',
+    // nodeAssociatePublicIpAddress: true,
+    // providerCredentialOpts: {
+        // profileName: 'default',
+    // },
     enabledClusterLogTypes: [
         'api',
         'audit',
@@ -43,6 +49,9 @@ const cluster = new eks.Cluster('ever-dev', {
         'scheduler'
     ],
     skipDefaultNodeGroup: false,
+    tags: {
+        Name: 'ever-dev',
+    }
 }, /* { protect: true } */ );
 
 const jenkinsNamespace = new k8s.core.v1.Namespace("jenkins-ns", {
@@ -56,13 +65,13 @@ const jenkinsNamespace = new k8s.core.v1.Namespace("jenkins-ns", {
 }, { provider: cluster.provider} );
 
 const jenkinsEbs = new aws.ebs.Volume("jenkins-home", {
-    availabilityZone: "us-east-1a", 
+    availabilityZone: "us-east-1a",
     size: 100,
     type: "gp2",
     tags: {
         Name: "jenkins-home",
     },
-}, /* { protect: true } */);
+}, /*{ protect: true }*/ );
 
 const args = {
     name: "jenkins",
