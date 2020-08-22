@@ -251,6 +251,16 @@ const jenkinsDeployment = new k8s.apps.v1.Deployment("jenkins-deployment", {
                                 mountPath: "/var/jenkins_home",
                             },
                         ],
+                        resources: {
+                            requests: {
+                                cpu: "250m",
+                                memory: "500Mi",
+                            },
+                            limits: {
+                                cpu: "500m",
+                                memory: "1000Mi",
+                            },
+                        },
                     },
                 ],
                 volumes: [
