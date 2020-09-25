@@ -85,12 +85,20 @@ const service_account = new k8s.yaml.ConfigFile('jenkins-service-acc', {
     file: "jenkins/service-account.yaml",
 }, { provider: cluster.provider });
 
-const apiRepository = new aws.ecr.Repository('gauzy-api', {
+const gauzyApiRepository = new aws.ecr.Repository('gauzy-api', {
     name: "gauzy-api",
 }, { protect: true });
 
-const webappRepository = new aws.ecr.Repository('gauzy-webapp', {
+const gauzyWebappRepository = new aws.ecr.Repository('gauzy-webapp', {
     name: "gauzy-webapp",
+}, { protect: true });
+
+const everCoreApiRepository = new aws.ecr.Repository('ever-core', {
+    name: "ever-core",
+}, { protect: true });
+
+const everAdminWebAngularRepository = new aws.ecr.Repository('ever-admin-web-angular', {
+    name: "ever-admin-web-angular",
 }, { protect: true });
 
 const jenkinsRepository = new aws.ecr.Repository('jenkins', {
@@ -101,7 +109,7 @@ const sonarqubeRepository = new aws.ecr.Repository('sonarqube', {
     name: "sonarqube",
 }, { protect: true });
 
-const imageLifecycleAPI = new aws.ecr.LifecyclePolicy('gauzy-api', {
+const gauzyImageLifecycleAPI = new aws.ecr.LifecyclePolicy('gauzy-api', {
     policy: {
         rules: [{
             rulePriority: 1,
@@ -116,10 +124,10 @@ const imageLifecycleAPI = new aws.ecr.LifecyclePolicy('gauzy-api', {
             },
         }],
     },
-    repository: apiRepository.name,
+    repository: gauzyApiRepository.name,
 });
 
-const imageLifecycleWebapp = new aws.ecr.LifecyclePolicy('gauzy-webapp', {
+const gauzyImageLifecycleWebapp = new aws.ecr.LifecyclePolicy('gauzy-webapp', {
     policy: {
         rules: [{
             rulePriority: 1,
@@ -134,7 +142,43 @@ const imageLifecycleWebapp = new aws.ecr.LifecyclePolicy('gauzy-webapp', {
             },
         }],
     },
-    repository: webappRepository.name,
+    repository: gauzyWebappRepository.name,
+});
+
+const everImageLifecycleCoreAPI = new aws.ecr.LifecyclePolicy('ever-core', {
+    policy: {
+        rules: [{
+            rulePriority: 1,
+            action: {
+                type: "expire",
+            },
+            selection: {
+                tagStatus: "untagged",
+                countType: "sinceImagePushed",
+                countUnit: "days",
+                countNumber: 2,
+            },
+        }],
+    },
+    repository: everCoreApiRepository.name,
+});
+
+const everImageLifecycleAdminAngular = new aws.ecr.LifecyclePolicy('ever-admin-web-angular', {
+    policy: {
+        rules: [{
+            rulePriority: 1,
+            action: {
+                type: "expire",
+            },
+            selection: {
+                tagStatus: "untagged",
+                countType: "sinceImagePushed",
+                countUnit: "days",
+                countNumber: 7,
+            },
+        }],
+    },
+    repository: everAdminWebAngularRepository.name,
 });
 
 const imageLifecycleJenkins = new aws.ecr.LifecyclePolicy('jenkins', {
